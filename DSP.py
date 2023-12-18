@@ -180,12 +180,8 @@ class MainWindow(QWidget):
         self.btn_building.clicked.connect(self.show_buildings)
 
     def init_things_window(self):
-        for name, picture, row, col in self.things_mgr.all_components():
-            if row >= 0 and col >= 0:
-                self.wnd_components.set_item(row, col, name, picture)
-        for name, picture, row, col in self.things_mgr.all_buildings():
-            if row >= 0 and col >= 0:
-                self.wnd_buildings.set_item(row, col, name, picture)
+        self.wnd_components.show_items(self.things_mgr.components())
+        self.wnd_buildings.show_items(self.things_mgr.buildings())
 
     def show_components(self):
         self.wnd_components.setVisible(True)
@@ -232,7 +228,7 @@ class MTipsButton(QPushButton):
     def enterEvent(self, event):
         x = event.globalPos().x() - event.localPos().x() + self.width() / 2
         y = event.globalPos().y() - event.localPos().y() + self.height() + 5
-        ThingTooltipWindow.inst.delay_show(self.name, QPoint(x, y), self.count)
+        ThingTooltipWindow.inst.delay_show(self.name, QPoint(int(x), int(y)), self.count)
 
     def leaveEvent(self, event):
         ThingTooltipWindow.inst.on_hide()
@@ -343,8 +339,8 @@ class ThingsTableWindow(MTableWidget):
         self.init_items()
 
     def init_items(self):
-        self.setRowCount(7)
-        self.setColumnCount(12)
+        self.setRowCount(9)
+        self.setColumnCount(14)
         for row in range(self.rowCount()):
             for col in range(self.columnCount()):
                 item = ThingsTableItem()
@@ -360,11 +356,13 @@ class ThingsTableWindow(MTableWidget):
                 item.set_name(None)
                 item.setCursor(Qt.ArrowCursor)
 
-    def set_item(self, row, col, name, picture):
-        item = self.cellWidget(row, col)
-        item.set_name(name)
-        item.set_icon(picture)
-        item.setCursor(Qt.PointingHandCursor)
+    def show_items(self, data):
+        for name, it in data.items():
+            if it['row'] >= 0 and it['col'] >= 0:
+                item = self.cellWidget(it['row'], it['col'])
+                item.set_name(name)
+                item.set_icon(it['icon'])
+                item.setCursor(Qt.PointingHandCursor)
 
 
 class FormulaListWidget(QListWidget):
@@ -489,7 +487,7 @@ class RequirementTableItem(MTableWidget):
         row = 0
         col = 0
         for name, value in data:
-            picture = ThingsMgr.create_inst().get_picture(name)
+            picture = ThingsMgr.create_inst().get_icon(name)
             item = RequirementThingWidget(name, picture, value)
             self.setCellWidget(row, col, item)
             col += 1
@@ -584,7 +582,7 @@ class SettingsWidget(QWidget):
         row = 0
         col = 0
         for name, formulas in self.formulas_mgr.all_multi_formulas():
-            if name in self.things_mgr.exclude_things['product']:
+            if self.things_mgr.is_exclude_product(name):
                 continue
             select_widget = FormulaSelectWidget(name, self)
             select_widget.add_formulas(formulas)
@@ -702,7 +700,7 @@ class CalculateWindow(QDialog):
 
     def on_show(self, name, value=60):
         self.name = name
-        picture = ThingsMgr.create_inst().get_picture(name)
+        picture = ThingsMgr.create_inst().get_icon(name)
         self.setWindowTitle(name)
         self.setWindowIcon(QIcon(os.path.join(PICTURES_FOLDER, picture)))
         self.btn_product.set_name(name)
@@ -826,7 +824,7 @@ class FormulaTimeWidget(MPushButton):
         self.btn_facility = MTipsButton(self)
         self.btn_facility.setFixedSize(QSize(20, 20))
         self.btn_facility.setIconSize(QSize(20, 20))
-        facility_picture = ThingsMgr.create_inst().get_picture(formula.facility)
+        facility_picture = ThingsMgr.create_inst().get_icon(formula.facility)
         self.btn_facility.set_icon(facility_picture)
         self.btn_facility.set_name(formula.facility)
 
@@ -857,7 +855,7 @@ class FormulaWidget(QWidget):
         self.hbl_widget.setSpacing(0)
         self.hbl_widget.addStretch(1)
         for name, value in formula.product.items():
-            picture = self.things_mgr.get_picture(name)
+            picture = self.things_mgr.get_icon(name)
             item = (FormulaThingWidget(name, picture, value)
                     if has_tip else FormulaThingWidget2(name, picture, value))
             item.clicked.connect(self.clicked.emit)
@@ -866,7 +864,7 @@ class FormulaWidget(QWidget):
         item_time.clicked.connect(self.clicked.emit)
         self.hbl_widget.addWidget(item_time)
         for name, value in formula.material.items():
-            picture = self.things_mgr.get_picture(name)
+            picture = self.things_mgr.get_icon(name)
             item = (FormulaThingWidget(name, picture, value)
                     if has_tip else FormulaThingWidget2(name, picture, value))
             item.clicked.connect(self.clicked.emit)
@@ -935,7 +933,7 @@ class FormulaTimeWidget2(MPushButton):
         self.btn_facility = MPushButton(self)
         self.btn_facility.setFixedSize(QSize(20, 20))
         self.btn_facility.setIconSize(QSize(20, 20))
-        facility_picture = ThingsMgr.create_inst().get_picture(formula.facility)
+        facility_picture = ThingsMgr.create_inst().get_icon(formula.facility)
         self.btn_facility.set_icon(facility_picture)
 
         self.hbl_widget = QHBoxLayout()
@@ -972,62 +970,65 @@ class FacilityPowerWidget(QWidget):
         super(FacilityPowerWidget, self).__init__(parent)
         self.things_mgr = ThingsMgr.create_inst()
         self.setStyleSheet(self.style_sheet)
-        self.lbl_working_power = QLabel('工作功率', self)
-        self.lbl_working_power.setObjectName('PowerName')
-        self.lbl_standby_power = QLabel('待机功率', self)
-        self.lbl_standby_power.setObjectName('PowerName')
-        self.lbl_output_power = QLabel('发电功率', self)
-        self.lbl_output_power.setObjectName('PowerName')
-        self.lbl_working_power_value = QLabel(self)
-        self.lbl_working_power_value.setObjectName('PowerValue')
-        self.lbl_standby_power_value = QLabel(self)
-        self.lbl_standby_power_value.setObjectName('PowerValue')
+        self.lbl_work_consumption = QLabel('工作功率', self)
+        self.lbl_idle_consumption = QLabel('待机功率', self)
+        self.lbl_power = QLabel('发电功率', self)
+        self.lbl_input_power = QLabel('输入功率', self)
+        self.lbl_output_power = QLabel('输出功率', self)
+        self.lbl_basic_generation = QLabel('基础发电功率', self)
+        self.lbl_max_charging_power = QLabel('最大充能功率', self)
+
+        self.lbl_work_consumption_value = QLabel(self)
+        self.lbl_idle_consumption_value = QLabel(self)
+        self.lbl_power_value = QLabel(self)
+        self.lbl_input_power_value = QLabel(self)
         self.lbl_output_power_value = QLabel(self)
-        self.lbl_output_power_value.setObjectName('PowerValue')
+        self.lbl_basic_generation_value = QLabel(self)
+        self.lbl_max_charging_power_value = QLabel(self)
 
         self.gdl_widget = QGridLayout(self)
         self.gdl_widget.setSpacing(0)
         self.gdl_widget.setContentsMargins(0, 0, 0, 0)
-        self.gdl_widget.addWidget(self.lbl_working_power, 0, 0)
-        self.gdl_widget.addWidget(self.lbl_standby_power, 1, 0)
-        self.gdl_widget.addWidget(self.lbl_output_power, 2, 0)
-        self.gdl_widget.addWidget(self.lbl_working_power_value, 0, 1)
-        self.gdl_widget.addWidget(self.lbl_standby_power_value, 1, 1)
-        self.gdl_widget.addWidget(self.lbl_output_power_value, 2, 1)
         self.gdl_widget.setColumnStretch(0, 1)
+
+        self._labels = [
+            ['work_consumption', self.lbl_work_consumption, self.lbl_work_consumption_value],
+            ['idle_consumption', self.lbl_idle_consumption, self.lbl_idle_consumption_value],
+            ['power', self.lbl_power, self.lbl_power_value],
+            ['input_power', self.lbl_input_power, self.lbl_input_power_value],
+            ['output_power', self.lbl_output_power, self.lbl_output_power_value],
+            ['basic_generation', self.lbl_basic_generation, self.lbl_basic_generation_value],
+            ['max_charging_power', self.lbl_max_charging_power, self.lbl_max_charging_power_value]
+        ]
+
+        row = 0
+        for attr, label_name, label_value in self._labels:
+            label_name.setObjectName('PowerName')
+            label_value.setObjectName('PowerValue')
+            self.gdl_widget.addWidget(label_name, row, 0)
+            self.gdl_widget.addWidget(label_value, row, 1)
+            row += 1
+
         self.resize(self.gdl_widget.sizeHint())
         self.on_hide()
 
     def on_show(self, name):
         flag = False
-        power = self.things_mgr.get_working_power(name)
-        if power > 0:
-            self.lbl_working_power_value.setText(trans_power(power))
-            self.lbl_working_power.setVisible(True)
-            self.lbl_working_power_value.setVisible(True)
-            flag = True
-        power = self.things_mgr.get_standby_power(name)
-        if power > 0:
-            self.lbl_standby_power_value.setText(trans_power(power))
-            self.lbl_standby_power.setVisible(True)
-            self.lbl_standby_power_value.setVisible(True)
-            flag = True
-        power = self.things_mgr.get_output_power(name)
-        if power > 0:
-            self.lbl_output_power_value.setText(trans_power(power))
-            self.lbl_output_power.setVisible(True)
-            self.lbl_output_power_value.setVisible(True)
-            flag = True
+        for attr, label_name, label_value in self._labels:
+            value = self.things_mgr.get_item_attr(name, attr)
+            if value and value > 0:
+                label_name.setVisible(True)
+                label_value.setVisible(True)
+                label_value.setText(trans_power(value))
+                flag = True
+            else:
+                label_name.setVisible(False)
+                label_value.setVisible(False)
+
         if flag:
             self.setVisible(True)
 
     def on_hide(self):
-        self.lbl_working_power.setVisible(False)
-        self.lbl_standby_power.setVisible(False)
-        self.lbl_output_power.setVisible(False)
-        self.lbl_working_power_value.setVisible(False)
-        self.lbl_standby_power_value.setVisible(False)
-        self.lbl_output_power_value.setVisible(False)
         self.setVisible(False)
 
 
@@ -1233,51 +1234,44 @@ class ThingsMgr(object):
     inst = None
 
     def __init__(self):
-        self.all_things = {}
-        self.components = {}
-        self.buildings = {}
-        self.exclude_things = {}
-        self.powers = {}
+        self._all_things = {}
+        self._components = {}
+        self._buildings = {}
+        self._exclude_things = {}
         self.utilization_level = 0
         self.assembler_level = '制造台MK.II'
         with open('Components.json', 'r', encoding='utf-8') as file:
-            self.components = json.load(file)
+            self._components = json.load(file)
         with open('Buildings.json', 'r', encoding='utf-8') as file:
-            self.buildings = json.load(file)
+            self._buildings = json.load(file)
         with open('Exclude.json', 'r', encoding='utf-8') as file:
-            self.exclude_things = json.load(file)
-        with open('Power.json', 'r', encoding='utf-8') as file:
-            self.powers = json.load(file)
-        self.all_things.update(self.components)
-        self.all_things.update(self.buildings)
+            self._exclude_things = json.load(file)
+        self._all_things.update(self._components)
+        self._all_things.update(self._buildings)
 
-    def all_components(self):
-        return [(name, pic, row, col) for name, (pic, row, col) in self.components.items()]
+    def components(self):
+        return self._components
 
-    def all_buildings(self):
-        return [(name, pic, row, col) for name, (pic, row, col) in self.buildings.items()]
+    def buildings(self):
+        return self._buildings
 
-    def get_picture(self, name):
-        thing = self.all_things.get(name, [])
-        return thing[0] if thing else ''
+    def get_item(self, name):
+        return self._all_things.get(name, {})
 
-    def get_working_power(self, name):
-        powers = self.powers.get(name, [])
-        if len(powers) > 0:
-            return powers[0]
-        return 0
+    def get_item_attr(self, name, attr):
+        return self._all_things.get(name, {}).get(attr)
 
-    def get_standby_power(self, name):
-        powers = self.powers.get(name, [])
-        if len(powers) > 1:
-            return powers[1]
-        return 0
+    def get_icon(self, name):
+        return self._all_things.get(name, {}).get('icon', '')
 
-    def get_output_power(self, name):
-        powers = self.powers.get(name, [])
-        if len(powers) > 2:
-            return powers[2]
-        return 0
+    def get_work_consumption(self, name):
+        return self._all_things.get(name, {}).get('work_consumption', 0)
+
+    def is_exclude_product(self, name):
+        return name in self._exclude_things['product']
+
+    def is_exclude_facility(self, name):
+        return name in self._exclude_things['facility']
 
     @classmethod
     def create_inst(cls):
@@ -1299,8 +1293,8 @@ class Formula(object):
 
     def get_requirement(self, product_name, speed):
         if (not isinstance(self.time, (int, float)) or self.time < 0 or
-                product_name in self.things_mgr.exclude_things['product'] or
-                self.facility in self.things_mgr.exclude_things['facility']):
+                self.things_mgr.is_exclude_product(product_name) or
+                self.things_mgr.is_exclude_facility(self.facility)):
             return None
         product_num = self.product[product_name]
         # 原料生产速度
@@ -1424,7 +1418,7 @@ class Requirement(object):
         for fac in requirement.facilities:
             for name, count in fac.items():
                 new_req.all_facilities[name] = self.all_facilities.get(name, 0) + math.ceil(count)
-                power = self.things_mgr.get_working_power(name) * count
+                power = self.things_mgr.get_work_consumption(name) * count
                 new_req.power += power
                 new_req.sum_power += power
         return new_req
@@ -1475,7 +1469,7 @@ class ProductMgr(object):
                                      sum_power=products.sum_power)]
             for name, speed in products.materials.items():
                 requirements = self.formulas_mgr.get_requirements(name, speed)
-                if name in self.things_mgr.exclude_things['product'] or (not requirements):
+                if self.things_mgr.is_exclude_product(name) or (not requirements):
                     for req1 in temp_reqs:
                         req1.add_material(name, speed)
                 else:
