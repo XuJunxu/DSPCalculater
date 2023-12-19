@@ -31,7 +31,7 @@
     "气态巨星（重氢）": {"icon": "重氢.png", "row": 2, "col": 1},
     "冰巨星": {"icon": "可燃冰.png", "row": 2, "col": 2},
     "硫酸海洋": {"icon": "硫酸.png", "row": 2, "col": 3},
-    "氢": {"icon": "氢.png", "row": 2, "col": 4},
+    "氢": {"icon": "氢.png", "row": 2, "col": 4, "exclude": 1},
     "反物质": {"icon": "反物质.png", "row": 2, "col": 5},
     "临界光子": {"icon": "临界光子.png", "row": 2, "col": 6},
     "精炼油": {"icon": "精炼油.png", "row": 2, "col": 7},

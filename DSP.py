@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import *
 
 
 PICTURES_FOLDER = 'Pictures'
+FILES_FOLDER = "Files"
 
 FACILITIES = {
     '制造台': '制造台MK.II',
@@ -228,6 +229,7 @@ class MTipsButton(QPushButton):
         super(MTipsButton, self).__init__(parent)
         self.name = None
         self.count = None
+        self.right_pressed = False
         self.clicked.connect(ThingTooltipWindow.inst.on_hide)
 
     def set_name(self, name):
@@ -256,7 +258,7 @@ class MTipsButton(QPushButton):
         if event.button() == Qt.RightButton and self.right_pressed:
             x = event.globalPos().x() - event.localPos().x() + self.width() / 2
             y = event.globalPos().y() - event.localPos().y() + self.height() + 5
-            ThingTooltipWindow.inst.show_relevant_formula(self.name, QPoint(x, y))
+            ThingTooltipWindow.inst.show_relevant_formula(self.name, QPoint(int(x), int(y)))
         self.right_pressed = False
         super(MTipsButton, self).mouseReleaseEvent(event)
 
@@ -1046,6 +1048,7 @@ class FacilityPowerWidget(QWidget):
         self.setVisible(False)
 
 
+# 鼠标悬浮提示框
 class ThingTooltipWindow(QFrame):
     inst = None
     name_style = '''
@@ -1127,7 +1130,8 @@ class ThingTooltipWindow(QFrame):
             formulas = self.formulas_mgr.get_formulas_by_material(self.name)
             text = '相关公式：'
         else:
-            formulas = self.formulas_mgr.get_formulas_by_product(self.name)
+            formulas = self.formulas_mgr.get_formulas_by_product(self.name) or \
+                       self.formulas_mgr.get_formulas_by_recipe(self.name)
             text = '合成公式：'
         if len(formulas) > 0:
             self.lbl_text.setText(text)
@@ -1160,79 +1164,6 @@ class ThingTooltipWindow(QFrame):
         return cls.inst
 
 
-class ThingTooltipWindow1(QListWidget):
-    inst = None
-
-    def __init__(self, parent=None):
-        super(ThingTooltipWindow1, self).__init__(parent)
-        self.setWindowFlag(Qt.ToolTip)
-        self.formulas_mgr = FormulasMgr.create_inst()
-        self.setEditTriggers(QAbstractItemView.NoEditTriggers)  # 不可编辑
-        self.setSelectionMode(QAbstractItemView.NoSelection)  # 不可选中
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.hide()
-
-    def on_show(self, name, pos):
-        formulas = self.formulas_mgr.get_formulas_by_product(name)
-        if not self.isVisible() and formulas:
-            for formula in formulas:
-                list_item = QListWidgetItem(self)
-                item = FormulaWidget(formula, False)
-                list_item.setSizeHint(item.sizeHint())
-                self.setItemWidget(list_item, item)
-            self.resize(self.sizeHintForColumn(0)+22, self.sizeHintForRow(0)*self.count()+22)
-            self.move(pos)
-            self.show()
-
-    def on_hide(self):
-        self.clear()
-        self.hide()
-
-    @classmethod
-    def create_inst(cls, parent=None):
-        if cls.inst is None:
-            cls.inst = cls(parent)
-        return cls.inst
-
-
-class ThingTooltipWindow2(MTableWidget):
-    inst = None
-
-    def __init__(self, parent=None):
-        super(ThingTooltipWindow2, self).__init__(parent)
-        self.setWindowFlag(Qt.ToolTip)
-        self.formulas_mgr = FormulasMgr.create_inst()
-        self.setColumnCount(1)
-        self.hide()
-
-    def on_show(self, name, pos):
-        formulas = self.formulas_mgr.get_formulas_by_product(name)
-        if not self.isVisible() and formulas:
-            self.setRowCount(len(formulas))
-            index = 0
-            for formula in formulas:
-                item = FormulaWidget(formula, False)
-                self.setCellWidget(index, 0, item)
-                index += 1
-            self.horizontalHeader().resizeSections()
-            self.resize(self.sizeHint())
-            self.move(pos)
-            self.show()
-
-    def on_hide(self):
-        for row in range(self.rowCount()):
-            self.cellWidget(row, 0).deleteLater()
-        self.setRowCount(0)
-        self.hide()
-
-    @classmethod
-    def create_inst(cls, parent=None):
-        if cls.inst is None:
-            cls.inst = cls(parent)
-        return cls.inst
-
-
 def trans_power(value):
     if value >= 1000000000:
         return '%.2f TW' % (value / 1000000000)
@@ -1252,17 +1183,18 @@ class ThingsMgr(object):
         self._components = {}
         self._buildings = {}
         self._others = {}
-        self._exclude_things = {}
+        self._items = {}
         self.utilization_level = 0
         self.assembler_level = '制造台MK.II'
-        with open('Components.json', 'r', encoding='utf-8') as file:
+        with open(os.path.join(FILES_FOLDER, 'Components.json'), 'r', encoding='utf-8') as file:
             self._components = json.load(file)
-        with open('Buildings.json', 'r', encoding='utf-8') as file:
+            self._items.update(self._components)
+        with open(os.path.join(FILES_FOLDER, 'Buildings.json'), 'r', encoding='utf-8') as file:
             self._buildings = json.load(file)
-        with open('Others.json', 'r', encoding='utf-8') as file:
+        with open(os.path.join(FILES_FOLDER, 'Others.json'), 'r', encoding='utf-8') as file:
             self._others = json.load(file)
-        with open('Exclude.json', 'r', encoding='utf-8') as file:
-            self._exclude_things = json.load(file)
+            self._items.update(self._others)
+
         self._all_things.update(self._components)
         self._all_things.update(self._buildings)
         self._all_things.update(self._others)
@@ -1289,10 +1221,10 @@ class ThingsMgr(object):
         return self._all_things.get(name, {}).get('work_consumption', 0)
 
     def is_exclude_product(self, name):
-        return name in self._exclude_things['product']
+        return not not self._items.get(name, {}).get('exclude')
 
-    def is_exclude_facility(self, name):
-        return name in self._exclude_things['facility']
+    def is_origin_facility(self, name):
+        return not not self._buildings.get(name, {}).get('origin')
 
     @classmethod
     def create_inst(cls):
@@ -1302,12 +1234,14 @@ class ThingsMgr(object):
 
 
 class Formula(object):
-    def __init__(self, product, material, time_, facility):
+    def __init__(self, data):
         self.things_mgr = ThingsMgr.create_inst()
-        self.product = product
-        self.material = material
-        self.time = time_
-        self.facility = facility
+        self.product = {}
+        self.material = {}
+        self.time = 0
+        self.facility = None
+        self.recipe = None
+        self.__dict__.update(data)
 
     def has_product(self, name):
         return name in self.product
@@ -1315,7 +1249,7 @@ class Formula(object):
     def get_requirement(self, product_name, speed):
         if (not isinstance(self.time, (int, float)) or self.time < 0 or
                 self.things_mgr.is_exclude_product(product_name) or
-                self.things_mgr.is_exclude_facility(self.facility)):
+                self.things_mgr.is_origin_facility(self.facility)):
             return None
         product_num = self.product[product_name]
         # 原料生产速度
@@ -1348,40 +1282,49 @@ class FormulasMgr(object):
     inst = None
 
     def __init__(self):
-        self.all_formulas = []
-        self.product_formulas = {}
-        self.material_formulas = {}
-        self.multi_formulas = {}
-        self.selected_formulas = {}
-        with open('Formulas.json', 'r', encoding='utf-8') as file:
+        self._all_formulas = []
+        self._product_formulas = {}
+        self._material_formulas = {}
+        self._recipe_formulas = {}
+        self._multi_formulas = {}
+        self._selected_formulas = {}
+        with open(os.path.join(FILES_FOLDER, 'Formulas.json'), 'r', encoding='utf-8') as file:
             json_data = json.load(file)
         for data in json_data:
-            formula = Formula(*data)
-            self.all_formulas.append(formula)
+            formula = Formula(data)
+            self._all_formulas.append(formula)
             for name in formula.product:
-                res = self.product_formulas.get(name, [])
+                res = self._product_formulas.get(name, [])
                 res.append(formula)
-                self.product_formulas[name] = res
+                self._product_formulas[name] = res
             for name in formula.material:
-                res = self.material_formulas.get(name, [])
+                res = self._material_formulas.get(name, [])
                 res.append(formula)
-                self.material_formulas[name] = res
-        for name, formulas in self.product_formulas.items():  # 获取有多条合成公式的组件
+                self._material_formulas[name] = res
+            if formula.recipe:
+                res = self._recipe_formulas.get(formula.recipe, [])
+                res.append(formula)
+                self._recipe_formulas[formula.recipe] = res
+
+        for name, formulas in self._product_formulas.items():  # 获取有多条合成公式的组件
             if len(formulas) > 1:
-                self.multi_formulas[name] = formulas
-                self.selected_formulas[name] = 0
+                self._multi_formulas[name] = formulas
+                self._selected_formulas[name] = 0
 
     def get_formulas_by_product(self, name):
-        return self.product_formulas.get(name, [])
+        return self._product_formulas.get(name, [])
 
     def get_formulas_by_material(self, name):
-        return self.material_formulas.get(name, [])
+        return self._material_formulas.get(name, [])
+
+    def get_formulas_by_recipe(self, recipe):
+        return self._recipe_formulas.get(recipe, [])
 
     def get_requirements(self, product_name, production_speed):
         result = []
-        formulas = self.product_formulas.get(product_name, [])
+        formulas = self._product_formulas.get(product_name, [])
         if len(formulas) > 0:
-            formula = formulas[self.selected_formulas.get(product_name, 0)]
+            formula = formulas[self._selected_formulas.get(product_name, 0)]
             req = formula.get_requirement(product_name, production_speed)
             if req:
                 result.append(req)
@@ -1390,23 +1333,23 @@ class FormulasMgr(object):
     # 获取所有多产物的合成公式
     def get_multi_products(self):
         result = []
-        for formula in self.all_formulas:
+        for formula in self._all_formulas:
             if len(formula.product) > 1:
                 result.append(formula)
         return result
 
     def get_multi_formulas(self, name):
-        return self.multi_formulas.get(name, [])
+        return self._multi_formulas.get(name, [])
 
     def all_multi_formulas(self):
-        return list(self.multi_formulas.items())
+        return list(self._multi_formulas.items())
 
     def set_selected_formula(self, name, value):
-        if name in self.selected_formulas:
-            self.selected_formulas[name] = value
+        if name in self._selected_formulas:
+            self._selected_formulas[name] = value
 
     def get_selected_formula(self, name):
-        return self.selected_formulas.get(name, 0)
+        return self._selected_formulas.get(name, 0)
 
     @classmethod
     def create_inst(cls):
