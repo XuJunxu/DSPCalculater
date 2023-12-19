@@ -152,44 +152,58 @@ class MainWindow(QWidget):
         self.setWindowIcon(QIcon('Logo.png'))
         self.things_mgr = ThingsMgr.create_inst()
         self.product_mgr = ProductMgr.create_inst()
-        self.btn_component = TopButton(self, '组件.png')
+        self.btn_component = TopButton(self, '物品.png')
         self.btn_building = TopButton(self, '建筑.png')
+        self.btn_other = TopButton(self, '杂项.png')
         self.wnd_components = ThingsTableWindow(self)
         self.wnd_buildings = ThingsTableWindow(self)
+        self.wnd_others = ThingsTableWindow(self)
 
         self.hbl_button = QHBoxLayout()
         self.hbl_button.addWidget(self.btn_component)
         self.hbl_button.addWidget(self.btn_building)
+        self.hbl_button.addWidget(self.btn_other)
         self.hbl_button.addStretch(1)
 
         self.vbl_main = QVBoxLayout()
         self.vbl_main.addLayout(self.hbl_button)
         self.vbl_main.addWidget(self.wnd_components)
         self.vbl_main.addWidget(self.wnd_buildings)
+        self.vbl_main.addWidget(self.wnd_others)
         self.vbl_main.setContentsMargins(0, 0, 0, 0)
 
         self.hbl_main = QHBoxLayout(self)
         self.hbl_main.addLayout(self.vbl_main)
         self.hbl_main.setContentsMargins(20, 10, 20, 20)
         self.wnd_buildings.setVisible(False)
+        self.wnd_others.setVisible(False)
         self.setFixedSize(self.hbl_main.sizeHint())
 
         self.init_things_window()
         self.show_components()
         self.btn_component.clicked.connect(self.show_components)
         self.btn_building.clicked.connect(self.show_buildings)
+        self.btn_other.clicked.connect(self.show_others)
 
     def init_things_window(self):
         self.wnd_components.show_items(self.things_mgr.components())
         self.wnd_buildings.show_items(self.things_mgr.buildings())
+        self.wnd_others.show_items(self.things_mgr.others())
 
     def show_components(self):
         self.wnd_components.setVisible(True)
         self.wnd_buildings.setVisible(False)
+        self.wnd_others.setVisible(False)
 
     def show_buildings(self):
         self.wnd_components.setVisible(False)
         self.wnd_buildings.setVisible(True)
+        self.wnd_others.setVisible(False)
+
+    def show_others(self):
+        self.wnd_components.setVisible(False)
+        self.wnd_buildings.setVisible(False)
+        self.wnd_others.setVisible(True)
 
     def closeEvent(self, event):
         sys.exit()
@@ -339,7 +353,7 @@ class ThingsTableWindow(MTableWidget):
         self.init_items()
 
     def init_items(self):
-        self.setRowCount(9)
+        self.setRowCount(8)
         self.setColumnCount(14)
         for row in range(self.rowCount()):
             for col in range(self.columnCount()):
@@ -1237,6 +1251,7 @@ class ThingsMgr(object):
         self._all_things = {}
         self._components = {}
         self._buildings = {}
+        self._others = {}
         self._exclude_things = {}
         self.utilization_level = 0
         self.assembler_level = '制造台MK.II'
@@ -1244,16 +1259,22 @@ class ThingsMgr(object):
             self._components = json.load(file)
         with open('Buildings.json', 'r', encoding='utf-8') as file:
             self._buildings = json.load(file)
+        with open('Others.json', 'r', encoding='utf-8') as file:
+            self._others = json.load(file)
         with open('Exclude.json', 'r', encoding='utf-8') as file:
             self._exclude_things = json.load(file)
         self._all_things.update(self._components)
         self._all_things.update(self._buildings)
+        self._all_things.update(self._others)
 
     def components(self):
         return self._components
 
     def buildings(self):
         return self._buildings
+
+    def others(self):
+        return self._others
 
     def get_item(self, name):
         return self._all_things.get(name, {})
