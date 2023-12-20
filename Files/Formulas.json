@@ -47,7 +47,7 @@
     {"products": {"电路板": 2}, "materials": {"铁块": 2, "铜块": 1}, "time": 1, "facility": "制造台MK.II"},
     {"products": {"引力透镜": 1}, "materials": {"金刚石": 4, "奇异物质": 1}, "time": 6, "facility": "制造台MK.II"},
     {"products": {"硫酸": 4}, "materials": {"精炼油": 6, "石矿": 8, "水": 4}, "time": 6, "facility": "化工厂"},
-    {"products": {"重氢": 1}, "materials": {"氢": 1}, "time": "1%", "facility": "分馏塔", "recipe": "（公式）重氢分馏", "relation": "重氢"},
+    {"products": {"重氢": 1}, "materials": {"氢": 1}, "time_str": "1%", "facility": "分馏塔", "recipe": "（公式）重氢分馏", "relation": "重氢"},
     {"products": {"碳纳米管": 2}, "materials": {"石墨烯": 3, "钛块": 1}, "time": 4, "facility": "化工厂"},
     {"products": {"奇异物质": 1}, "materials": {"粒子容器": 2, "铁块": 2, "重氢": 10}, "time": 8, "facility": "微型粒子对撞机"},
     {"products": {"配送运输机": 1}, "materials": {"铁块": 2, "动力引擎": 1, "处理器": 1}, "time": 2, "facility": "制造台MK.II"},
