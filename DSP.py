@@ -1125,7 +1125,7 @@ class ThingTooltipWindow(QFrame):
         self._thing = thing
         self.pos = pos
         self._count = count
-        self.timer_show.start(300)
+        self.timer_show.start(200)
 
     def show_relevant_formula(self, thing, pos):
         self._thing = thing
@@ -1194,11 +1194,12 @@ def trans_power(value):
 
 
 class Thing(object):
-    def __init__(self, name, icon='', row=-1, col=-1):
+    def __init__(self, name, icon='', row=-1, col=-1, exclude=None):
         self.name = name
         self.icon = icon
         self.row = row
         self.col = col
+        self.exclude = exclude
 
         self._selected_formula = None
         self._product_formulas = []
@@ -1238,18 +1239,12 @@ class Thing(object):
         return None
 
 
-class Component(Thing):
-    def __init__(self, name, icon='', row=-1, col=-1, exclude=None):
-        super(Component, self).__init__(name, icon, row, col)
-        self.exclude = exclude
-
-
 class Building(Thing):
-    def __init__(self, name, icon='', row=-1, col=-1, facility_type=None, work_consumption=None, idle_consumption=None,
-                 power=None, input_power=None, output_power=None, basic_generation=None, max_charging_power=None,
-                 transport_speed=None, collecting_speed=None, collecting_speed_2=None, cycle_speed=None,
-                 production_speed=None, origin=None, mineral=None):
-        super(Building, self).__init__(name, icon, row, col)
+    def __init__(self, name, icon='', row=-1, col=-1, exclude=None, facility_type=None, work_consumption=None,
+                 idle_consumption=None, power=None, input_power=None, output_power=None, basic_generation=None,
+                 max_charging_power=None, transport_speed=None, collecting_speed=None, collecting_speed_2=None,
+                 cycle_speed=None, production_speed=None, origin=None, mineral=None):
+        super(Building, self).__init__(name, icon, row, col, exclude)
         self.facility_type = facility_type
         self.work_consumption = work_consumption
         self.idle_consumption = idle_consumption
@@ -1423,11 +1418,11 @@ class ThingsMgr(object):
     def load_things(self):
         with open(os.path.join(FILES_FOLDER, 'Components.json'), 'r', encoding='utf-8') as file:
             for name, data in json.load(file).items():
-                self._components[name] = Component(name, **data)
+                self._components[name] = Thing(name, **data)
 
         with open(os.path.join(FILES_FOLDER, 'OtherComponents.json'), 'r', encoding='utf-8') as file:
             for name, data in json.load(file).items():
-                self._others[name] = Component(name, **data)
+                self._others[name] = Thing(name, **data)
 
         with open(os.path.join(FILES_FOLDER, 'Buildings.json'), 'r', encoding='utf-8') as file:
             for name, data in json.load(file).items():
